@@ -65,7 +65,7 @@ class LARBEDAnalysis:
         if pad_size is None:
             pad_size= 0
         if self.mixing is None:
-            self.mixing = np.sum(self.mtf_2d**2)/(self.mtf_2d.shape[0]*self.mtf_2d.shape[1])
+            self.mixing = 1#np.sum(self.mtf_2d**2)/(self.mtf_2d.shape[0]*self.mtf_2d.shape[1])
         for i in range(len(self.Store_Larbed)):
             print(i)
             deconvolved  = []
