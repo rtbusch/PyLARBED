@@ -117,10 +117,10 @@ class LARBEDAnalysis:
         plt.colorbar()
         plt.show()
 
-    def ZeroLarbed(self):
+    def ZeroLarbed(self,ratio=1):
         plt.figure()
         plt.imshow(ApertureSum(self.data, self.center[0], self.center[1], self.IntRadius),
-                                 cmap='gray')
+                                 cmap='inferno', vmin=0, vmax = np.max(self.average_aligned)*ratio)
         plt.title('Larbed at' + str(self.center))
         plt.colorbar()
         plt.show()

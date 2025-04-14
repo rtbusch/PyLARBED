@@ -85,7 +85,7 @@ def ApertureSumVariance(matrix, center_x, center_y, g=1,m=1,VarB=1, radius=0, bk
     for i in range(center_x - radius, center_x + radius + 1):
         for j in range(center_y - radius, center_y + radius + 1):
             if 0 <= i < rows and 0 <= j < cols:
-                pixel_sum += matrix[:,:,i,j]*g*m/VarB + VarB
+                pixel_sum += matrix[:,:,i,j]*g*m
                 count += 1
     pixel_sum = pixel_sum
     if bkg != (0,0):
@@ -252,7 +252,7 @@ def AnnularVar(matrix, center_x, center_y,g,m,VarB, ri, ro):
             if 0 <= i < rows and 0 <= j < cols:
                 distance = np.sqrt((i - center_x)**2 + (j - center_y)**2)
                 if ri <= distance <= ro:
-                    pixel_sum += matrix[:,:,i,j]*m*g/VarB + VarB
+                    pixel_sum += matrix[:,:,i,j]*m*g
                     count2 += 1
     return pixel_sum/count2
 
