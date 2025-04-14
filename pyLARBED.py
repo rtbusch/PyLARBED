@@ -58,6 +58,7 @@ def ApertureSum(matrix, center_x, center_y, radius=0, bkg=(0,0)):
                 pixel_sum += matrix[:,:,i,j]
                 count += 1
     pixel_sum = pixel_sum
+    print("Sum:", count)
     if bkg != (0,0):
         pixel_sum -= AnnularSum(matrix, center_x, center_y, bkg[0], bkg[1])*count
     
@@ -88,6 +89,7 @@ def ApertureSumVariance(matrix, center_x, center_y, g=1,m=1,VarB=1, radius=0, bk
                 pixel_sum += matrix[:,:,i,j]*g*m
                 count += 1
     pixel_sum = pixel_sum
+    print("Var:", count)
     if bkg != (0,0):
         pixel_sum += AnnularVar(matrix, center_x, center_y,g,m,VarB, bkg[0], bkg[1])*count
     

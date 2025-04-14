@@ -28,6 +28,7 @@ class LARBEDAnalysis:
         self.mixing = None
         self.center = (64, 64)
         self.IntRadius = 4
+        self.IntZero = []
 
     def load_data(self,type=0):
         self.data = ReadRaw(self.file_name,type=type)
@@ -55,7 +56,7 @@ class LARBEDAnalysis:
         self.data = deconvolved_stack
         return 
     
-    def deconv_Larbedstack(self, background=0, niter=100, varB=797, delta=0, A=1, g=1, mtf_2d=None, pad_size=None):
+    def deconv_Larbedstack(self, background=0, niter=100, varB=6.29, delta=0.0, A=1, g=1, mtf_2d=None, pad_size=None):
         deconvolved_stack = np.zeros_like(self.Store_Larbed)
         deconvolved_Variance = np.zeros_like(self.Store_LarbedVariance)
 
@@ -118,9 +119,9 @@ class LARBEDAnalysis:
         plt.show()
 
     def ZeroLarbed(self,ratio=1):
+        self.IntZero = ApertureSum(self.data, self.center[0], self.center[1], self.IntRadius)
         plt.figure()
-        plt.imshow(ApertureSum(self.data, self.center[0], self.center[1], self.IntRadius),
-                                 cmap='inferno', vmin=0, vmax = np.max(self.average_aligned)*ratio)
+        plt.imshow(self.IntZero, cmap='inferno', vmin=0, vmax = np.max(self.average_aligned)*ratio)
         plt.title('Larbed at' + str(self.center))
         plt.colorbar()
         plt.show()
