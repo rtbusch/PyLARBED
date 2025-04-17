@@ -91,7 +91,7 @@ def ApertureSumVariance(matrix, center_x, center_y, g=1,m=1,VarB=1, radius=0, bk
     pixel_sum = pixel_sum
     print("Var:", count)
     if bkg != (0,0):
-        pixel_sum += AnnularVar(matrix, center_x, center_y,g,m,VarB, bkg[0], bkg[1])*count
+        pixel_sum += AnnularVar(matrix, center_x, center_y,g,m,VarB, bkg[0], bkg[1])*count*count
     
     pixel_sum[pixel_sum<0] = 0
 

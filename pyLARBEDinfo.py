@@ -23,6 +23,7 @@ class LARBEDAnalysis:
         self.g_grid = None
         self.g_vectors = None
         self.Larbed = []
+        self.LarbedDeconvolved = []
         self.gg_pixels = []
         self.mtf_2d = None
         self.mixing = None
@@ -56,7 +57,7 @@ class LARBEDAnalysis:
         self.data = deconvolved_stack
         return 
     
-    def deconv_Larbedstack(self, background=0, niter=100, varB=6.29, delta=0.0, A=1, g=1, mtf_2d=None, pad_size=None):
+    def deconv_Larbedstack(self, background=0, niter=100, varB=6.29, delta=0.0, A=1, g=1, mtf_2d=None, pad_size=None, m=1):
         deconvolved_stack = np.zeros_like(self.Store_Larbed)
         deconvolved_Variance = np.zeros_like(self.Store_LarbedVariance)
 
@@ -64,8 +65,8 @@ class LARBEDAnalysis:
             self.mtf_2d = mtf_2d
         if pad_size is None:
             pad_size= 0
-        if self.mixing is None:
-            self.mixing = 1#np.sum(self.mtf_2d**2)/(self.mtf_2d.shape[0]*self.mtf_2d.shape[1])
+        #if self.mixing is None:
+        self.mixing = m#np.sum(self.mtf_2d**2)/(self.mtf_2d.shape[0]*self.mtf_2d.shape[1])
         for i in range(len(self.Store_Larbed)):
             print(i)
             deconvolved  = []
@@ -78,8 +79,8 @@ class LARBEDAnalysis:
             
             deconvolved_stack[i] = deconvolved[pad_size:self.Store_Larbed[i].shape[0]+pad_size,pad_size:self.Store_Larbed[i].shape[0]+pad_size]        
             deconvolved_Variance[i]=self.Store_LarbedVariance[i]+ self.mixing*g*deconvolved_stack[i] + varB
-        self.Store_Larbed = deconvolved_stack
-        self.Store_LarbedVariance = deconvolved_Variance
+        self.LarbedDeconvolved = deconvolved_stack
+        #self.Store_LarbedVariance = deconvolved_Variance
         return 
 
 
@@ -229,6 +230,7 @@ class LARBEDAnalysis:
     
     def save_larbed(self, filename):
         np.save(filename + '_Store_Larbed.npy', self.Store_Larbed)
+        np.save(filename + '_Store_LarbedDeconvolved.npy', self.LarbedDeconvolved)
         np.save(filename + '_Store_LarbedVariance.npy', self.Store_LarbedVariance)
         np.save(filename + '_g_vectors.npy', self.g_vectors)
 
@@ -245,6 +247,7 @@ class LARBEDCalibration:
     def load_data(self, type=0):
         self.data = ReadRaw(self.file_name,type=type)
         self.center = (int(self.data.shape[2]//2), int(self.data.shape[3]//2))
+        plt.imshow(self.data[int(self.data.shape[0]//2),int(self.data.shape[1]//2)], cmap='gray')
 
     def meanimage(self):
         return np.mean(self.data, axis=(0, 1))
