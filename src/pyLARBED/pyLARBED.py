@@ -49,7 +49,7 @@ def ApertureSum(matrix, center_x, center_y, radius=0, bkg=(0,0)):
         Note: Leaving radius as 0 is equivalent to a point VDF.'''
     #Aperture VDF
     pixel_sum = np.zeros((matrix.shape[0], matrix.shape[1]))
-    rows, cols = len(matrix[2]), len(matrix[3])
+    rows, cols = matrix.shape[2], matrix.shape[3]
     count = 0
 
     for i in range(center_x - radius, center_x + radius + 1):
@@ -66,7 +66,7 @@ def ApertureSum(matrix, center_x, center_y, radius=0, bkg=(0,0)):
 
     return pixel_sum
 
-def ApertureSumVariance(matrix, center_x, center_y, g=1,m=1,VarB=1, radius=0, bkg=(0,0)):
+def ApertureSumVariance(matrix, center_x, center_y, g=1,m=1,DQE=1, radius=0, bkg=(0,0)):
     '''
     Aperture VDF: sums the counts within a circular aperture of a given radius around a given center.
     Args:
@@ -80,20 +80,21 @@ def ApertureSumVariance(matrix, center_x, center_y, g=1,m=1,VarB=1, radius=0, bk
         Note: Leaving radius as 0 is equivalent to a point VDF.'''
     #Aperture VDF
     pixel_sum = np.zeros((matrix.shape[0], matrix.shape[1]))
-    rows, cols = len(matrix[2]), len(matrix[3])
+    rows, cols = matrix.shape[2], matrix.shape[3]
     count = 0
 
     for i in range(center_x - radius, center_x + radius + 1):
         for j in range(center_y - radius, center_y + radius + 1):
             if 0 <= i < rows and 0 <= j < cols:
-                pixel_sum += matrix[:,:,i,j]*g*m
+                pixel_sum += matrix[:,:,i,j]*g*m / DQE
                 count += 1
     pixel_sum = pixel_sum
     print("Var:", count)
     if bkg != (0,0):
-        pixel_sum += AnnularVar(matrix, center_x, center_y,g,m,VarB, bkg[0], bkg[1])*count
-    
-    pixel_sum[pixel_sum<0] = 0
+        var =  AnnularVar(matrix, center_x, center_y,g,m,DQE, bkg[0], bkg[1])        
+        pixel_sum += var*count**2
+
+    pixel_sum[pixel_sum<0] = 0   
 
     return pixel_sum
 
@@ -220,7 +221,7 @@ def AnnularSum(matrix, center_x, center_y, ri, ro):
     '''
     #Annular VDF
     pixel_sum = np.zeros((matrix.shape[0], matrix.shape[1]))
-    rows, cols = len(matrix[2]), len(matrix[3])
+    rows, cols = matrix.shape[2], matrix.shape[3]
     count2 = 0
 
     for i in range(center_x - ro, center_x + ro + 1):
@@ -232,7 +233,7 @@ def AnnularSum(matrix, center_x, center_y, ri, ro):
                     count2 += 1
     return pixel_sum/count2
 
-def AnnularVar(matrix, center_x, center_y,g,m,VarB, ri, ro):
+def AnnularVar(matrix, center_x, center_y,g,m,DQE, ri, ro):
     '''
     Annular VDF: sums the counts within an annular aperture of a given inner and outer radius around a given center.
     Args:
@@ -246,17 +247,16 @@ def AnnularVar(matrix, center_x, center_y,g,m,VarB, ri, ro):
     '''
     #Annular VDF
     pixel_sum = np.zeros((matrix.shape[0], matrix.shape[1]))
-    rows, cols = len(matrix[2]), len(matrix[3])
+    rows, cols = matrix.shape[2], matrix.shape[3]
     count2 = 0
-
+    mask = np.zeros((matrix.shape[2], matrix.shape[3]))
     for i in range(center_x - ro, center_x + ro + 1):
         for j in range(center_y - ro, center_y + ro + 1):
             if 0 <= i < rows and 0 <= j < cols:
                 distance = np.sqrt((i - center_x)**2 + (j - center_y)**2)
                 if ri <= distance <= ro:
-                    pixel_sum += matrix[:,:,i,j]*m*g
-                    count2 += 1
-    return pixel_sum/count2
+                    mask[i,j] = 1
+    return np.std(matrix[:,:,mask==1], axis=2)**2
 
 def Precession(matrix, center_x, center_y, ri, ro):
     '''

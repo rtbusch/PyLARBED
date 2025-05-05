@@ -1,5 +1,5 @@
 import numpy as np
-
+from scipy.signal import convolve as convolve2d
 
 def sgnoise(img, m, g, A, delta, varB):
     img[img<1] = 1
@@ -15,8 +15,8 @@ def chisq2d(exp, convolved, bval, m, g, A, delta, varB):
     tchi = np.nansum(error[tden!=0]/tden[tden!=0])
     return tchi/(exp.shape[0]*exp.shape[1]-1)
 
-def convolved2d(img, mtf):
-    return np.real(np.fft.ifft2(np.fft.fft2(img)*mtf))
+# def convolved2d(img, mtf):
+#     return np.real(np.fft.ifft2(np.fft.fft2(img)*mtf))
 
 
 def lucy_Richardson(dp, mtf, background, niter, varB=0, delta=0, A=1, g=1, m=1, ):
@@ -38,7 +38,8 @@ def lucy_Richardson(dp, mtf, background, niter, varB=0, delta=0, A=1, g=1, m=1, 
     exp = dp - background
 
     lucy = np.full(dp.shape, np.sum(exp)/(dp.shape[0]*dp.shape[1]), dtype=np.float32)
-    lucyc = convolved2d(lucy, mtf)
+    # lucyc = convolved2d(lucy, mtf)
+    lucyc = convolve2d(lucy, mtf, mode='same')
     print(f"initial chisq: {chisq2d(exp, lucyc, background, m, g, A, delta, varB)}")
 
     for iter in range(niter):
@@ -47,8 +48,8 @@ def lucy_Richardson(dp, mtf, background, niter, varB=0, delta=0, A=1, g=1, m=1, 
         den[den == 0] = 1
         ratio = num/den
 
-        lucy *= convolved2d(ratio, mtf)
-        lucyc = convolved2d(lucy, mtf)
+        lucy *= convolve2d(ratio, mtf, mode='same')
+        lucyc = convolve2d(lucy, mtf, mode='same')
 
         print(f"iter: {iter} chisq: {chisq2d(exp, lucyc, background, m, g, A, delta, varB)}")
     return lucy
