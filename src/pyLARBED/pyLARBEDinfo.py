@@ -1,15 +1,14 @@
+
 import numpy as np
 from matplotlib.patches import Rectangle, Circle
 from scipy.ndimage import rotate
 from scipy.stats import norm
 from scipy.optimize import curve_fit
-from scipy.interpolate import interp1d
-from scipy.ndimage import zoom
+from scipy.ndimage import zoom, shift
 from skimage.feature import peak_local_max
-import pickle
-from pyLARBED import ReadRaw, AlignByBeam, ApertureSumVariance, ApertureSum, getGridVectors_Adjust, get_gvectors, Precession, getGridVectors
-import LucyRichardson as lr
-from PeakTools import gaussian2D, fitPeak2DGauss
+from pyLARBED.pyLARBED import ReadRaw, AlignByBeam, ApertureSumVariance, ApertureSum, getGridVectors_Adjust, get_gvectors, Precession, getGridVectors
+import pyLARBED.LucyRichardson as lr
+from pyLARBED.PeakTools import gaussian2D, fitPeak2DGauss
 
 import matplotlib.pyplot as plt
 
@@ -69,8 +68,7 @@ class LARBEDAnalysis:
         self.mixing = m#np.sum(self.mtf_2d**2)/(self.mtf_2d.shape[0]*self.mtf_2d.shape[1])
         for i in range(len(self.Store_Larbed)):
             print(i)
-            deconvolved  = []
-            deconvolved  = np.pad(self.Store_Larbed[i], 
+            deconvolved  = np.pad(self.raw_stack[i], 
                         pad_width=((pad_size, pad_size), 
                                     (pad_size , pad_size)), 
                         mode='edge')
@@ -78,9 +76,10 @@ class LARBEDAnalysis:
                                                 niter, varB, delta, A, g, self.mixing)
             
             deconvolved_stack[i] = deconvolved[pad_size:self.Store_Larbed[i].shape[0]+pad_size,pad_size:self.Store_Larbed[i].shape[0]+pad_size]        
-            deconvolved_Variance[i]=self.Store_LarbedVariance[i]+ self.mixing*g*deconvolved_stack[i] + varB
-        self.LarbedDeconvolved = deconvolved_stack
-        #self.Store_LarbedVariance = deconvolved_Variance
+            # deconvolved_Variance[i]=self.Store_LarbedVariance[i]+ self.mixing*g*deconvolved_stack[i] + varB
+        
+        self.Store_Larbed = deconvolved_stack
+        self.Store_LarbedVariance = deconvolved_Variance
         return 
 
 
@@ -95,6 +94,7 @@ class LARBEDAnalysis:
         self.g_vectors = get_gvectors(g1, g2, self.grid)
 
     def calculate_grid_vectors(self, crop=1, order=3, Adjust=True):
+        #TODO: adjust the x, y sequence, these two are not the same
         if Adjust:
             self.grid = getGridVectors_Adjust(self.center[0],self.center[1], 
                                               self.gg_pixels[0][0], self.gg_pixels[0][1], 
@@ -104,7 +104,7 @@ class LARBEDAnalysis:
             self.grid = getGridVectors(self.center[0],self.center[1], 
                                         self.gg_pixels[0][0], self.gg_pixels[0][1], 
                                         self.gg_pixels[1][0], self.gg_pixels[1][1],  
-                                        self.average_aligned, order=order)
+                                        order=order)
 
     def plot_averages(self, ratio=0.2):
         plt.figure()
@@ -140,25 +140,30 @@ class LARBEDAnalysis:
         plt.show()
 
 
-    def IntegrateLarbed(self, ri = 4, ro = (0,0), g=1,m=1,VarB=1,Variance=False):
+    def IntegrateLarbed(self, ri = 4, ro = (0,0), g=1, m=1, DQE=1, Variance=False):
         self.Store_Larbed = []
         self.Store_LarbedVariance = []
         removal = []
-        for count, vector in enumerate(self.grid):
-            try:
-                New_Larbed = ApertureSum(self.data, vector[1][0], vector[1][1], ri, ro)
-                self.Store_Larbed.append(New_Larbed)
-                if Variance:
-                    New_LarbedVariance = ApertureSumVariance(self.data, vector[1][0], vector[1][1], 
-                                                             g, m, VarB, ri, ro) 
-                    # 1, 0.1319299, 6.2968867, 4, (7, 9)
-                    self.Store_LarbedVariance.append(New_LarbedVariance)
-            except:
+        for count, vector in enumerate(self.grid):            
+            New_Larbed = ApertureSum(self.data, vector[1][0], vector[1][1], ri, ro)
+            if np.all(New_Larbed == 0):
+                print(f"Skipping g-vector {self.g_vectors[count]} due to zero intensity.")
                 removal.append(count)
                 continue
+            self.Store_Larbed.append(New_Larbed)
+            if Variance:
+                New_LarbedVariance = ApertureSumVariance(self.data, vector[1][0], vector[1][1], 
+                                                            g, m, DQE, ri, ro) 
+                
+                # 1, 0.1319299, 6.2968867, 4, (7, 9)
+                self.Store_LarbedVariance.append(New_LarbedVariance)                
+        
         for i in sorted(removal, reverse=True):
-            self.g_vectors.pop(i)
             self.grid.pop(i)
+        self.raw_stack = np.copy(self.Store_Larbed)
+        
+
+        
 
     def plot_IntegratedLarbed(self, index, Variance = False):
         if Variance:
@@ -192,7 +197,7 @@ class LARBEDAnalysis:
         for count, vector in enumerate(self.grid):
             vector2 = self.grid[count]
             if order_option == 0:
-                if self.g_vectors[count][0] < -order or self.g_vectors[count][1] < -order or self.g_vectors[count][2] < -order or self.g_vectors[count][0] > order or self.g_vectors[count][1]  > order or g_vectors[count][2] >order: 
+                if self.g_vectors[count][0] < -order or self.g_vectors[count][1] < -order or self.g_vectors[count][2] < -order or self.g_vectors[count][0] > order or self.g_vectors[count][1]  > order or self.g_vectors[count][2] >order: 
                     continue
             if order_option == 1:
                 if np.sqrt(self.g_vectors[count][0]**2 + self.g_vectors[count][1]**2 + self.g_vectors[count][2]**2) > order: 
@@ -287,7 +292,8 @@ class LARBEDCalibration:
                 
                 # Extract the patch and apply sub-pixel alignment
                 patch = self.data[i + self.roi_size[0], j + self.roi_size[0], y_start:y_end, x_start:x_end]
-                aligned_patch = zoom(patch, (1, 1), order=3, mode='nearest', prefilter=True)
+                aligned_patch = shift(patch, shift=(crop_size/2 - (y_center - y_start), crop_size/2 - (x_center - x_start)), order=3)
+                # aligned_patch = zoom(patch, (1, 1), order=3, mode='nearest', prefilter=True)
                 
                 # Ensure the cropped patch is of the correct size
                 if aligned_patch.shape == (crop_size, crop_size):
