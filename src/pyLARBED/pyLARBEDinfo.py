@@ -6,7 +6,7 @@ from scipy.stats import norm
 from scipy.optimize import curve_fit
 from scipy.ndimage import zoom, shift
 from skimage.feature import peak_local_max
-from pyLARBED.pyLARBED import ReadRaw, AlignByBeam, ApertureSumVariance, ApertureSum, getGridVectors_Adjust, get_gvectors, Precession, getGridVectors
+from pyLARBED.pyLARBED import ReadRaw, AlignByBeam, ApertureSumVariance, ApertureSum, getGridVectors_Adjust,getGridVectorsHOLZ, get_gvectors, Precession, getGridVectors
 import pyLARBED.LucyRichardson as lr
 from pyLARBED.PeakTools import gaussian2D, fitPeak2DGauss
 
@@ -32,6 +32,8 @@ class LARBEDAnalysis:
 
     def load_data(self,type=0):
         self.data = ReadRaw(self.file_name,type=type)
+        self.data[self.data < 0] = 0
+        self.data[self.data > 394575776.0] = 0
         self.center = (int(self.data.shape[2]//2), int(self.data.shape[3]//2))
 
     def align_data(self, iterations=3):
@@ -87,15 +89,23 @@ class LARBEDAnalysis:
         self.average_raw = np.mean(self.data, axis=(0, 1))
         self.average_aligned = self.average_raw
     
-    def assign_gvector(self, g1, g2):
-        self.gg_pixels = (g1, g2)
+    def assign_gvector(self, g1, g2, g3=(0,0),g4=(0,0)):
+        self.gg_pixels = (g1, g2, g3, g4)
 
-    def calculate_g_vectors(self, g1, g2):
-        self.g_vectors = get_gvectors(g1, g2, self.grid)
+    def calculate_g_vectors(self, g1, g2, g3,g4):
+        self.g_vectors = get_gvectors(g1, g2, self.grid, g3, g4)
 
     def calculate_grid_vectors(self, crop=1, order=3, Adjust=True):
         #TODO: adjust the x, y sequence, these two are not the same
-        if Adjust:
+        if self.gg_pixels[2] is not None:
+            self.grid = getGridVectorsHOLZ(self.center[0], self.center[1],
+                                          self.gg_pixels[0][0], self.gg_pixels[0][1], 
+                                          self.gg_pixels[1][0], self.gg_pixels[1][1],  
+                                          self.gg_pixels[2][0], self.gg_pixels[2][1], 
+                                          self.gg_pixels[3][0], self.gg_pixels[3][1],
+                                          order1=order[0], order2=order[1], order3=order[2], order4=order[3])
+
+        elif Adjust:
             self.grid = getGridVectors_Adjust(self.center[0],self.center[1], 
                                               self.gg_pixels[0][0], self.gg_pixels[0][1], 
                                               self.gg_pixels[1][0], self.gg_pixels[1][1],  
@@ -120,7 +130,7 @@ class LARBEDAnalysis:
         plt.show()
 
     def ZeroLarbed(self,ratio=1):
-        self.IntZero = ApertureSum(self.data, self.center[0], self.center[1], self.IntRadius)
+        self.IntZero, _ = ApertureSum(self.data, self.center[0], self.center[1], self.IntRadius)
         plt.figure()
         plt.imshow(self.IntZero, cmap='inferno', vmin=0, vmax = np.max(self.average_aligned)*ratio)
         plt.title('Larbed at' + str(self.center))
@@ -143,16 +153,18 @@ class LARBEDAnalysis:
     def IntegrateLarbed(self, ri = 4, ro = (0,0), g=1, m=1, DQE=1, Variance=False):
         self.Store_Larbed = []
         self.Store_LarbedVariance = []
+        self.Store_bkg = []
         removal = []
         for count, vector in enumerate(self.grid):            
-            New_Larbed = ApertureSum(self.data, vector[1][0], vector[1][1], ri, ro)
+            New_Larbed, Bkg_Larbed = ApertureSum(self.data, int(vector[1][0]), int(vector[1][1]), ri, ro)
             if np.all(New_Larbed == 0):
                 print(f"Skipping g-vector {self.g_vectors[count]} due to zero intensity.")
                 removal.append(count)
                 continue
             self.Store_Larbed.append(New_Larbed)
+            self.Store_bkg.append(Bkg_Larbed)
             if Variance:
-                New_LarbedVariance = ApertureSumVariance(self.data, vector[1][0], vector[1][1], 
+                New_LarbedVariance = ApertureSumVariance(self.data, int(vector[1][0]), int(vector[1][1]), 
                                                             g, m, DQE, ri, ro) 
                 
                 # 1, 0.1319299, 6.2968867, 4, (7, 9)
@@ -160,6 +172,7 @@ class LARBEDAnalysis:
         
         for i in sorted(removal, reverse=True):
             self.grid.pop(i)
+            self.g_vectors.pop(i)
         self.raw_stack = np.copy(self.Store_Larbed)
         
 
@@ -238,6 +251,9 @@ class LARBEDAnalysis:
         np.save(filename + '_Store_LarbedDeconvolved.npy', self.LarbedDeconvolved)
         np.save(filename + '_Store_LarbedVariance.npy', self.Store_LarbedVariance)
         np.save(filename + '_g_vectors.npy', self.g_vectors)
+
+    def out_larbed(self):
+        return self.Store_Larbed, self.Store_bkg, self.Store_LarbedVariance, self.g_vectors
 
 class LARBEDCalibration:
     def __init__(self, file_name):

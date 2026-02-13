@@ -34,6 +34,28 @@ def ReadRaw(fname, type=0):
     return dp
 
 
+def FEM_StackAverage(matrix, center_x, center_y, Avg_img=None, rot_average=False):
+    FEM_image = np.zeros_like(matrix)
+    if Avg_img is not None:
+        FEM_avg = np.average(Avg_img, axis=(0,1))**2
+    else:
+        FEM_avg = Avg_img
+    if rot_average:
+        radial = radial_profile(FEM_avg, (center_x, center_y))
+        radial_image = np.zeros(FEM_avg.shape)
+        for angle in range(360):
+            theta = np.deg2rad(angle)
+            x_offset = int(center_x + radial[int(angle % len(radial))] * np.cos(theta))
+            y_offset = int(center_y + radial[int(angle % len(radial))] * np.sin(theta))
+            if 0 <= x_offset < radial_image.shape[0] and 0 <= y_offset < radial_image.shape[1]:
+                radial_image[x_offset, y_offset] += FEM_avg[int(angle % FEM_avg.shape[0])]
+        FEM_image += radial_image
+        
+    for i in range(matrix.shape[0]):
+        for j in range(matrix.shape[1]):
+            FEM_image += (matrix[i,j,:,:]**2)/FEM_avg - 1
+    return FEM_image
+
 
 def ApertureSum(matrix, center_x, center_y, radius=0, bkg=(0,0)):
     '''
@@ -49,6 +71,7 @@ def ApertureSum(matrix, center_x, center_y, radius=0, bkg=(0,0)):
         Note: Leaving radius as 0 is equivalent to a point VDF.'''
     #Aperture VDF
     pixel_sum = np.zeros((matrix.shape[0], matrix.shape[1]))
+    bkg_sum = np.zeros((matrix.shape[0], matrix.shape[1]))
     rows, cols = matrix.shape[2], matrix.shape[3]
     count = 0
 
@@ -60,11 +83,15 @@ def ApertureSum(matrix, center_x, center_y, radius=0, bkg=(0,0)):
     pixel_sum = pixel_sum
     print("Sum:", count)
     if bkg != (0,0):
+        bkg_sum += AnnularSum(matrix, center_x, center_y, bkg[0], bkg[1])*count
         pixel_sum -= AnnularSum(matrix, center_x, center_y, bkg[0], bkg[1])*count
+        
     
     pixel_sum[pixel_sum<0] = 0
 
-    return pixel_sum
+    return pixel_sum, bkg_sum
+
+
 
 def ApertureSumVariance(matrix, center_x, center_y, g=1,m=1,DQE=1, radius=0, bkg=(0,0)):
     '''
@@ -155,6 +182,33 @@ def getGridVectors(x0, y0, x2, y2, x1, y1, order=3):
                 continue
             grid.append(((i,j),vector))
     return grid
+
+def getGridVectorsHOLZ(x0, y0, x1, y1, x2, y2, x3, y3,x4,y4, order1=3, order2=3, order3=3, order4=3):
+    """
+    Generates a grid of vectors using three basis vectors, each with its own order.
+    Args:
+        x0, y0: center coordinates
+        x1, y1: first vector
+        x2, y2: second vector
+        x3, y3: third vector
+        order1: order for first vector
+        order2: order for second vector
+        order3: order for third vector
+    Returns:
+        grid: list of ((i, j, k), (x, y)) tuples
+    """
+    grid = []
+    for i in range(-order1, order1 + 1):
+        for j in range(-order2, order2 + 1):
+            for k in range(-order3, order3 + 1):
+                for l in range(-order4, order4 + 1):
+                    x = x0 + i * (x1 - x0) + j * (x2 - x0) + k * (x3 - x0) + l * (x4 - x0)
+                    y = y0 + i * (y1 - y0) + j * (y2 - y0) + k * (y3 - y0) + l * (y4 - y0)
+                    if x < 1 or x > 122 or y < 1 or y > 122:
+                        continue
+                    grid.append(((i, j, k, l), (x, y)))
+    return grid
+
 
 def find_nearest_peak(vector, matrix, crop=4):
     '''
@@ -328,8 +382,15 @@ def radial_profile(data, center):
     return radialprofile
 
 
-def get_gvectors(g1, g2, grid):
+def get_gvectors(g1, g2, grid,g3,g4):
     g_vectors = []
+    if g3 is not None:
+        for vector in grid:
+            g_vector = (vector[0][0]*g1[0] + vector[0][1]*g2[0] + vector[0][2]*g3[0]+ vector[0][3]*g4[0],
+                        vector[0][0]*g1[1] + vector[0][1]*g2[1] + vector[0][2]*g3[1]+ vector[0][3]*g4[1],
+                        vector[0][0]*g1[2] + vector[0][1]*g2[2] + vector[0][2]*g3[2]+ vector[0][3]*g4[2])
+            g_vectors.append(g_vector)
+        return g_vectors
     for vector in grid:
         g_vector = (vector[0][0]*g1[0] + vector[0][1]*g2[0], vector[0][0]*g1[1] + vector[0][1]*g2[1], vector[0][0]*g1[2] + vector[0][1]*g2[2])
         g_vectors.append(g_vector)
