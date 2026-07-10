@@ -1,7 +1,4 @@
 # PyLARBED
-pip install -e PyLARBED
-
-# PyLARBED
 
 Python tools for extracting diffracted beam intensities from Large-Angle Rocking Beam Electron Diffraction (LARBED) data collected on an EMPAD (Electron Microscope Pixel Array Detector).
 
