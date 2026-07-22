@@ -66,7 +66,8 @@ larbed.save_larbed("YIG12/Zone-245")
 
 ```python
 # Optional: calibrate the detector MTF from a separate probe/vacuum scan,
-# then deconvolve the main dataset against it
+# then deconvolve the main dataset against it.
+# This is legacy code now. Because we are integrating, this step is not necessary and just adds noise to the data.
 calib = LARBEDCalibration("path/to/probe_scan.raw")
 calib.load_data(type=0)
 calib.find_peaks(start=100, end=115)
